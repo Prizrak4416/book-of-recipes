@@ -1,17 +1,17 @@
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 import requests
-import calendar
 import time
+from datetime import date
+from pathlib import Path
 
 " USD Cur_ID = 145 ondate=2016-7-01"
 "https://www.nbrb.by/api/exrates/rates/145?ondate=2016-7-01"
 
 Cur_ID = 145
 
+
 # load json file with nbrb.by site
-def loadPrices(val, filename):
+def load_prices(val, filename):
     url = 'https://www.nbrb.by/api/exrates/rates/{}?ondate={}'.format(val, filename)
     while True:
         try:
@@ -22,45 +22,40 @@ def loadPrices(val, filename):
     dat = dat.json()
     return dat
 
+
 # make list calendar
-def makeCalendar(last_date):
-    dates = []
-    c = calendar.Calendar(0)
-    for i in range(2010, 2021):
-        for j in range(1, 13):
-            for weeks in c.monthdayscalendar(i, j):
-                for day in weeks:
-                    if day != 0:
-                        dates.append('{}-{}-{}'.format(i, j, day))
-                    if len(dates) != 0:
-                        if dates[-1] == last_date:
-                            return dates
+def make_calendar(start_date):
+    dates = pd.period_range(start_date, date.today())
     return dates
 
 
 def make_table(calMas):
-    table = pd.DataFrame(columns=['date', 'price'])
-    for i in range(len(calMas)):
-        a = loadPrices(Cur_ID, calMas[i])
+    table = pd.DataFrame(columns=['price'])
+    for i in calMas:
+        a = load_prices(Cur_ID, i)
         if a['Cur_OfficialRate'] > 100:
-            table.loc[i] = [calMas[i], a['Cur_OfficialRate'] / 10000]
+            table.loc[i] = [a['Cur_OfficialRate'] / 10000]
         else:
-            table.loc[i] = [calMas[i], a['Cur_OfficialRate']]
-        print(calMas[i])
-    table = table.set_index(pd.DatetimeIndex(table['date']))
-    table = table.drop('date', 1)
+            table.loc[i] = [a['Cur_OfficialRate']]
+        print(i)
+    # table = table.set_index(pd.DatetimeIndex(table['date']))
+    # table = table.drop('date', 1)
     return table
 
 
-# url = loadPrices('https://www.nbrb.by/api/exrates/currencies')
-# for i in url:
-#     if i['Cur_Abbreviation'] == 'USD':
-#         print(i['Cur_ID'])
+file_name = 'USDBYN2010_2020.csv'
+if Path(file_name).exists():
+    table = pd.read_csv('USDBYN2010_2020.csv', index_col=0)
+    date_start = table.index[-1]
+    calendar_mas = make_calendar(date_start)
+    print('calendar created')
+    table_p = make_table(calendar_mas)
+    table_price = pd.concat([table, table_p])
+    print(table_price)
 
-
-calendar_mas = makeCalendar('2020-9-28')
-table_price = make_table(calendar_mas)
-print(table_price)
-table_price.to_csv('1.csv')
-
-
+else:
+    calendar_mas = make_calendar('2010-10-01')
+    print('calendar created')
+    table_price = make_table(calendar_mas)
+    print(table_price)
+table_price.to_csv(file_name)
